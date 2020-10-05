@@ -1,9 +1,6 @@
-import os
 import time
 import numpy as np
 import cv2
-from PIL import Image
-import glob
 import logging
 import pyrealsense2 as rs
 
@@ -27,7 +24,7 @@ class CSICamera(BaseCamera):
 
     def gstreamer_pipelineout(self, output_width=1280, output_height=720, framerate=21, client_ip='127.0.0.1'):
         return 'appsrc ! videoconvert ! video/x-raw, format=(string)BGRx, width=%d, height=%d, framerate=(fraction)%d/1 ! videoconvert ! video/x-raw, format=(string)I420 ! omxh264enc tune=zerolatency bitrate=8000000 speed-preset=ultrafast ! video/x-h264, stream-format=byte-stream ! rtph264pay mtu=1400 ! udpsink host=%s port=5000 sync=false async=false' % (
-        output_width, output_height, framerate, client_ip)
+            output_width, output_height, framerate, client_ip)
 
     def __init__(self, image_w=160, image_h=120, image_d=3, capture_width=640, capture_height=480, framerate=60,
                  gstreamer_flip=0, client_ip='127.0.0.1'):
@@ -98,17 +95,27 @@ class CSICamera(BaseCamera):
 
 class RS_D435i(object):
     '''
-    Intel RealSense depth camera D435i combines the robust depth sensing capabilities of the D435 with the addition of an inertial measurement unit (IMU).
-    ref: https://www.intelrealsense.com/depth-camera-d435i/
+
     '''
 
-    def gstreamer_pipelineout(self, output_width=1280, output_height=720, framerate=21, client_ip='127.0.0.1'):
-        return 'appsrc ! videoconvert ! video/x-raw, format=(string)BGRx, width=%d, height=%d, framerate=(fraction)%d/1 ! videoconvert ! video/x-raw, format=(string)I420 ! omxh264enc tune=zerolatency bitrate=8000000 speed-preset=ultrafast ! video/x-h264, stream-format=byte-stream ! rtph264pay mtu=1400 ! udpsink host=%s port=5001 sync=false async=false' % (
-        output_width, output_height, framerate, client_ip)
-
     def __init__(self, image_w=640, image_h=480, image_d=3, image_output=True, framerate=30, client_ip='127.0.0.1'):
-        # Using the image_output will grab two image streams from the fisheye cameras but return only one.
-        # This can be a bit much for USB2, but you can try it. Docs recommend USB3 connection for this.
+        """
+        Configures and initializes a stream from a connected Intel RealSense depth camera to a receiving client.
+
+        Intel RealSense depth camera D435i combines the robust depth sensing capabilities of the D435 with the addition of an inertial measurement unit (IMU).
+        ref: https://www.intelrealsense.com/depth-camera-d435i/
+
+        The RealSense stream gets sent to port 5001 on the receiving host IP.
+        Args:
+            image_w (int): width of the output image.
+            image_h (int): height of the output image.
+            image_d (int): If 3, outputs RGB data, if 1 monochrome.
+            image_output (bool): If True, image is streamed along with IMU data. If False, only IMU data.
+                Using the image_output will grab two image streams from the fisheye cameras but return only one.
+                This can be a bit much for USB2, but you can try it. Docs recommend USB3 connection for this.
+            framerate (int): Desired framerate. Default is 30.
+            client_ip (str): IP address of the client which will receive the stream.
+        """
         self.image_output = image_output
         self.client_ip = client_ip
         # Declare RealSense pipeline, encapsulating the actual device and sensors
@@ -120,11 +127,13 @@ class RS_D435i(object):
         if self.image_output:
             cfg.enable_stream(rs.stream.color, image_w, image_h, rs.format.bgr8, framerate)  # color camera
 
-            self.out_send = cv2.VideoWriter(self.gstreamer_pipelineout(
-                output_width=image_w,
-                output_height=image_h,
-                framerate=framerate,
-                client_ip=self.client_ip), cv2.CAP_GSTREAMER, 0, framerate, (image_w, image_h), True)
+            gstreamer_pipeline = self.gstreamer_pipelineout(
+                                    output_width=image_w,
+                                    output_height=image_h,
+                                    framerate=framerate,
+                                    client_ip=self.client_ip)
+            image_dimensions = (image_w, image_h)
+            self.out_send = cv2.VideoWriter(gstreamer_pipeline, cv2.CAP_GSTREAMER, 0, framerate, image_dimensions, True)
 
             cfg.enable_stream(rs.stream.depth, image_w, image_h, rs.format.z16, framerate)  # depth camera
 
@@ -138,7 +147,59 @@ class RS_D435i(object):
         self.img = None
         self.dimg = None
 
+    def gstreamer_pipelineout(self, output_width=1280, output_height=720, output_framerate=21, client_ip='127.0.0.1'):
+        """
+        Configures a gstreamer pipeline definition for streaming RealSense camera data.
+
+        Args:
+            output_width: Width of the output image.
+            output_height: Height of the output image.
+            output_framerate: Framerate for stream.
+            client_ip: IP address of client to send stream to. Default is localhost (127.0.0.1)
+
+        Returns:
+            (str) gstreamer pipeline stream that defines how the RealSense stream is sent to the VR receiving host.
+
+        """
+
+        # return 'appsrc ! videoconvert ! video/x-raw, format=(string)BGRx, width=%d, height=%d, framerate=(fraction)%d/1 ! videoconvert ! video/x-raw, format=(string)I420 ! omxh264enc tune=zerolatency bitrate=8000000 speed-preset=ultrafast ! video/x-h264, stream-format=byte-stream ! rtph264pay mtu=1400 ! udpsink host=%s port=5001 sync=false async=false' % (
+        # output_width, output_height, framerate, client_ip)
+
+        # Convert supplied video settings into gstreamer parameters
+        format = "format=(string)BGRx"
+        width = f"width={output_width}""
+        height = f"height={output_height}"
+        framerate = f"framerate=(fraction){output_framerate}/1"
+        BGRx_video_settings = ",".join(["video/x-raw"] + [format, width, height, framerate])
+
+        I420_video_settings = "video/x-raw, format=(string)I420"
+
+        encoding_settings = "omxh264enc tune=zerolatency bitrate=8000000 speed-preset=ultrafast"
+
+        video_stream_settings = "video/x-h264, stream-format=byte-stream"
+
+        payload_encoder = "rtph264pay mtu=1400"
+
+        network_sink = f"udpsink host={client_ip} port=5001 sync=false async=false"
+
+        gstreamer_pipeline_out = ["appsrc",
+                                  "videoconvert", BGRx_video_settings,
+                                  "videoconvert", I420_video_settings,
+                                  encoding_settings,
+                                  video_stream_settings,
+                                  payload_encoder,
+                                  network_sink
+                                  ]
+
+        return " ! ".join(gstreamer_pipeline_out)
+
     def poll(self):
+        """
+        Polls the RealSense and updates frames and IMU data.
+
+        Returns:
+            None
+        """
         try:
             frames = self.pipe.wait_for_frames()
         except Exception as e:
@@ -147,7 +208,6 @@ class RS_D435i(object):
 
         if self.image_output:
             color_frame = frames.get_color_frame()
-
             depth_frame = frames.get_depth_frame()
             self.img = np.asanyarray(color_frame.get_data())
             self.dimg = np.asanyarray(depth_frame.get_data())
