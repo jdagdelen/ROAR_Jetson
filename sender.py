@@ -9,6 +9,10 @@ THETA_MIN = 0;
 
 class Sender:
     def __init__(self):
+        """
+        Class responsible for sending control instructions to the Arduino controller.
+
+        """
         self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1, writeTimeout=1)
         self.prev_throttle = 1500  # record previous throttle, set to neutral initially 
         self.prev_steering = 1500  # record previous steering, set to neutral initially

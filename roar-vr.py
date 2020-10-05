@@ -11,23 +11,24 @@ from sender import Sender
 from receiver import Receiver
 from controller import NaiveController
 
-def drive(cfg, client_ip=None, to_control=False):
+def drive(cfg, client_ip=None, to_control=False, stationary=True):
 
     #Initialize car
     V = vehicle.Vehicle()
     client_ip = client_ip or cfg.CLIENT_IP
 
-    #camA = CSICamera(image_w=cfg.IMAGE_W, image_h=cfg.IMAGE_H, image_d=cfg.IMAGE_DEPTH, framerate=cfg.CAMERA_FRAMERATE, gstreamer_flip=cfg.CSIC_CAM_GSTREAMER_FLIP_PARM,client_ip=client_ip)
-    #camB = RS_D435i(image_w=cfg.IMAGE_W, image_h=cfg.IMAGE_H, image_d=cfg.IMAGE_DEPTH, framerate=cfg.CAMERA_FRAMERATE,client_ip=client_ip)
+    camA = CSICamera(image_w=cfg.IMAGE_W, image_h=cfg.IMAGE_H, image_d=cfg.IMAGE_DEPTH, framerate=cfg.CAMERA_FRAMERATE, gstreamer_flip=cfg.CSIC_CAM_GSTREAMER_FLIP_PARM,client_ip=client_ip)
+    camB = RS_D435i(image_w=cfg.IMAGE_W, image_h=cfg.IMAGE_H, image_d=cfg.IMAGE_DEPTH, framerate=cfg.CAMERA_FRAMERATE,client_ip=client_ip)
 
-    #V.add(camA, outputs=['cam/image_array_a'], threaded=True)
-    #V.add(camB, outputs=['cam/image_array_b', 'cam/image_array_c'], threaded=True)
+    V.add(camA, outputs=['cam/image_array_a'], threaded=True)
+    V.add(camB, outputs=['cam/image_array_b', 'cam/image_array_c'], threaded=True)
 
-    if to_control:
-        V.add(NaiveController(), outputs=['throttle', 'steering'], threaded=True)
-        V.add(Sender(), inputs=['throttle', 'steering'], threaded=True)
-    else:
-        V.add(Receiver(client_ip), threaded=True)
+    if not stationary:
+        if to_control:
+            V.add(NaiveController(), outputs=['throttle', 'steering'], threaded=True)
+            V.add(Sender(), inputs=['throttle', 'steering'], threaded=True)
+        else:
+            V.add(Receiver(client_ip), threaded=True)
 
     #run the vehicle for 20 seconds
     V.start(rate_hz=cfg.DRIVE_LOOP_HZ, 

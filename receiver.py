@@ -14,6 +14,12 @@ UDP_PORT = 7788
 
 class Receiver:
     def __init__(self, client_ip):
+        """
+        Responsible for receiving control commands and relaying them to the arduino vehicle control system.
+
+        Args:
+            client_ip: IP address of the system running the VR control client.
+        """
         self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
         self.old_steering = 0.0
         self.old_throttle = 0.0
@@ -23,6 +29,12 @@ class Receiver:
         self.client_ip = client_ip
 
     def update(self):
+        """
+        Gets the most recent control commands from the client and updates the current control states.
+
+        Returns:
+            None (TODO: perhaps have this return diagnostics about changes between values, jitter, etc)
+        """
         while True:
             vel_wheel = self.ser.readline()
             vel_wheel = str(vel_wheel)
@@ -45,6 +57,15 @@ class Receiver:
             self.new_steering = min(1, self.new_steering)
 
     def run_threaded(self, **args):
+        """
+        TODO: Figure out what this function does and write a useful docstring for it.
+
+        Args:
+            **args:
+
+        Returns:
+
+        """
         if (self.new_throttle != self.old_throttle):
             msg = struct.pack('>Ii', COMMAND_THROTTLE, int(self.new_throttle * 32767))
             self.sock.sendto(msg, (self.client_ip, UDP_PORT))
