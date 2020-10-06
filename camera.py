@@ -130,7 +130,7 @@ class RS_D435i(object):
             gstreamer_pipeline = self.gstreamer_pipelineout(
                                     output_width=image_w,
                                     output_height=image_h,
-                                    framerate=framerate,
+                                    output_framerate=framerate,
                                     client_ip=self.client_ip)
             image_dimensions = (image_w, image_h)
             self.out_send = cv2.VideoWriter(gstreamer_pipeline, cv2.CAP_GSTREAMER, 0, framerate, image_dimensions, True)
@@ -167,7 +167,7 @@ class RS_D435i(object):
 
         # Convert supplied video settings into gstreamer parameters
         format = "format=(string)BGRx"
-        width = f"width={output_width}""
+        width = f"width={output_width}"
         height = f"height={output_height}"
         framerate = f"framerate=(fraction){output_framerate}/1"
         BGRx_video_settings = ",".join(["video/x-raw"] + [format, width, height, framerate])

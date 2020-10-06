@@ -6,4 +6,3 @@ prettytable==0.7.2
 pyrealsense2==2.33.1
 pyserial==3.4
 statistics==1.0.3.5
-
